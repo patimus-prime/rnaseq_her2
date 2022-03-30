@@ -11,7 +11,8 @@ library(ggplot2)
 library(stringr)
 library(knitr)
 library(clipr) 
-library(edger)
+library(edgeR)  # NOTE: Must capitalize R lolololol
+
 
 setwd("~/rnaseq")
 rna_data <- read.csv("tcga.brca.rsem.csv",
@@ -94,7 +95,89 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
 # 6. Into edgeR for normalization
       
       
+      y <- drop_na(patient_IHC)
       
+      matching_ids <- intersect(y$Patient.ID,colnames(rna_data_t_rd,))
+      # therefore mathcing records contains all paitent ids with both IHC results and RNASeqs of primary tumors
+      
+      #matching_ids <- as.data.frame(matching_ids) 
+      
+       
+      
+      # so let's dump what's not in here for our below analysis
+      
+      xx <- select(rna_data_t_rd, matching_ids)
+      
+      # now a discrepancy between rna_data_t_rd and y, the no NA patient IHC data)
+      # so like... I guess 
+      
+      #u <- as.data.frame(matching_ids)
+    
+    Patient.ID <- intersect(y$Patient.ID, matching_ids) # NEW MATCHING IDS
+    newMATCHES <- as.data.frame(Patient.ID)
+    #final <- as.data.frame(uu)
+    
+   # only keeps the values in newMATCHES, left df, if extras detected
+    EXALTATION <- y %>%
+      semi_join(newMATCHES, by = "Patient.ID")
+    
+    weird_rows <- y %>%
+      anti_join(newMATCHES, by = "Patient.ID") # FIXME: need to investigate this later
+    
+    EXCELLENCE <- EXALTATION %>%
+      anti_join(weird_rows, by = "Patient.ID")
+    
+    
+    # YES!!!!!!!
+    eee <- distinct(EXALTATION) #weird lol
+    
+    # ok so we now have all columns that match, after much derision and confusion
+      
+      
+      # now let's get the ihc that matches up
+      d <- DGEList(counts = xx, group = factor(eee$IHC.HER2))
+      d
+      dim(d) #cool, everything is working
+      
+      
+      d <- calcNormFactors(d)
+      
+      d$samples
+      
+      ################
+      # BEHOLD! THE REMAINDER IS SIMPLE NOW THIS OBJECT IS DEFINED. WE MAY NOW GET CLUSTERS ETC.
+      # THEN WE CAN TAKE THE OUTPUT NORMALIZED FACTORS, THE MOST CRITICAL COMPONENTS AS DETERMINED 
+      # BY PCA, AND THEN FEED THAT INTO THE LOGISTIC REGRESSION MODEL ALONG WITH THE ALLELE/COUNT THING
+      #############
+      
+      
+      # cool
+      # BOOM THAT'S FINALLY DEFINED WHAT WHAT!!!!!
+      
+      #dge <- calcNormFactors(dge, method = "TMM")
+      #tmm <- cpm(dge)
+      
+      norm_counts <- cpm(d) # interesting how much stuff changed lol, but those were raw counts and these are cpm from TMM
+      
+      
+      
+      # INCREDIBLE -----------------------------
+      
+      # these are the rnaseq results that match up with the shit
+      
+      # filter the rows of genes that have very low expression 
+      # use cutoff of 1 counts per million; i'll try a few things but 
+      # a quick google wasn't enough to find a good rule of thumb, so going off edgeR guide
+      cutoff = 1 # counts per million
+      keptGenes <- rowSums(cpm(rna_data_t_rd) > cutoff) >= ncol(rna_data_t_rd) #LAST PART = # LIBRARIES, SO 
+                                                                            # THE ENTIRE ROW HAS AT LEAST 1 READ/CPM PER LIBRARY
+      
+      # now i think I might be skipping some steps... let's eat first 
+      # ok, let's get this stuff into a list and make sure we're starting from the beginning
+      super <- rna_data_t_rd[keptGenes,]
+      super <- calcNormFactors(super, method = "upperquartile")
+      
+     
 # Normalize ---------
 # I'll adjust for read depth (total row counts), but regular normalization doesn't seem possible;
 # I guess gene lengths could be imported to account for that, but this may have already been done during
