@@ -11,6 +11,7 @@ library(ggplot2)
 library(stringr)
 library(knitr)
 library(clipr) 
+library(edger)
 
 setwd("~/rnaseq")
 rna_data <- read.csv("tcga.brca.rsem.csv",
@@ -31,19 +32,19 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
 #combined_results_df %>%
 #  filter(grepl('surface area = ', V1)) -> combined_results_df
 
-rna_data %>%
-  filter(grepl('Primary Tumor', sample_type)) -> rna_data_primary_tumor_only
+rna_data_primary_tumor_only <- rna_data %>%
+  filter(grepl('Primary Tumor', sample_type)) 
 # 1212 rows to 1093
 
 
-# 2. Drop barcode and sample type columns now that we've filtered the latter
+# 2. Drop barcode and sample type columns now that we've filtered the latter ------------
 #    Leaving patient_id unaltered; when we transpose and normalize we may then
 #    use this in a design matrix or pull for modeling, scoop up other data from clinic
 
 rna_data_genes_only <- rna_data_primary_tumor_only %>% 
   select(-c("bcr_patient_barcode","sample_type"))
 
-# 3. Transpose this dataframe so we can begin our work! Patient_id/libraries as columns
+# 3. Transpose this dataframe so we can begin our work! Patient_id/libraries as columns ----------------
 
 #testrna <- as.data.frame(rna_data_genes_only[,1:9])
 
@@ -54,28 +55,46 @@ rna_data_genes_only <- rna_data_primary_tumor_only %>%
 
 rna_data_t = setNames(data.frame(t(rna_data_genes_only[,-1])), rna_data_genes_only[,1])
 
+
+# 4. Round up all data ----------------
+
 rna_data_t_rd <- round(rna_data_t, digits = 0)
-
-#tmydf_rounded <- round(tmydf, digits = 0)
-
-#x <- as.data.frame(t(testrna))
-#y <- as.data.frame()
-#rna_data_t <- t(rna_data_genes_only)
+# hold for data from other files
+# this will be principally used for most stuff in edgeR, but
+# we'll want to pivot back AFTER normalizing and use HER2 column and others for modeling
 
 
-#rna_data_only_genes <- subset(rna_data, select = -c("patient_id","bcr_patient_code","sample_type"))
+# 5. We must get data from other sources --------------------
+#    so we can actually verify that the 
+#    way patients' expression differs is actually due to +/- 
 
-# do we transpose yet? transpose is necessary for PCA
-# No. Right now we need to get this normalized, so summing everything but the first 3 columns
+#    A. Get patient ID and IHC, remove NA; we'll use this to define groups
+#       We'll use copy number later when modeling, more useful for verifying
 
-# ok let's try dropping then bring back those columns
+      clinical_data <- read.csv("brca_tcga_clinical_data.csv",
+                                stringsAsFactors = FALSE)
+      
+      patient_IHC <- clinical_data %>%
+        select(Patient.ID, IHC.HER2)
+      # WARNING: contains NA, Intermediate, Equivocal - perhaps useful in a design matrix later.
+      # maybe we can also come back and grab copy number to see how that clusters!
+      # will require definition of design matrix
 
-#patient_tumor_columns <- rna_data %>%
-#  select(c("patient_id","bcr_patient_barcode","sample_type"))
+#     B. Grab the positive and negative groups.
+      
+      positive_patients <- patient_IHC %>%
+        filter(grepl('Positive', IHC.HER2)) 
+      #164 patients
+      negative_patients <- patient_IHC %>%
+        filter(grepl('Negative', IHC.HER2))
+      #567 patients
 
-#rna_data_only_genes <- rna_data %>% 
-#  select(-c("patient_id","bcr_patient_barcode","sample_type"))
+# now we have our groups defined, can specify for edgeR below
 
+# 6. Into edgeR for normalization
+      
+      
+      
 # Normalize ---------
 # I'll adjust for read depth (total row counts), but regular normalization doesn't seem possible;
 # I guess gene lengths could be imported to account for that, but this may have already been done during
