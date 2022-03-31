@@ -205,7 +205,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       io_DEGdf <- topTags(et2, n = 10)
       # THERE'S ERBB2 LET'S GET A LIST OF THOSE GENES HOMIE!
       
-      io_DEGdf <- as.data.frame(io_DEG)
+      io_DEGdf <- as.data.frame(io_DEGdf)
       io_DEG <- tibble::rownames_to_column(io_DEGdf, "Genes")
       io_ls_DEG <- io_DEG$Genes
       # # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
@@ -346,41 +346,84 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       
       ggplot(d_t, aes(x = ERBB2, colour = IHC.HER2)) +
         geom_density()
-      # well, noisier, but we see some cutoff
-      # where mostly positive stuff appears. but definity noisier
-      # so still shows supplmentary is the way to go
-      # let's look at clustering by just like the top 10 most DE genes,
-      # as determined by those most different in positive/negative groups
       
+      
+      io_ls_DEG
+      
+      ggplot(d_t, aes(x = STARD3, colour = IHC.HER2)) +
+          geom_density()
+      ggplot(d_t, aes(x = PGAP3, colour = IHC.HER2)) +
+        geom_density()
+      ggplot(d_t, aes(x = C17orf37, colour = IHC.HER2)) +
+        geom_density()
+      ggplot(d_t, aes(x = ORMDL3, colour = IHC.HER2)) +
+        geom_density()
+      
+      
+      # ok, let's try clustering with just the top 5, it doesn't look promising , but maybe
+      # if not, we'll move onto the logit function and call it a day lol\
+      
+# 12. Reclustering with only the top 5 most DE genes and hoping for a miracle!
+      
+      # we'll do with +/- then all and see, 'cuz right now it's not looking too hot for using this as
+      # the sole diagnostic tool
+      #her2df <- io_t_norm[c("Patient.ID", "ERBB2")]
+      top5df_io <- io_t_norm[c("Patient.ID","ERBB2","STARD3","PGAP3","C17orf37","ORMDL3")]
+      top5df_io <- top5df_io %>%
+        remove_rownames %>% column_to_rownames(var = "Patient.ID")
+      top5df_io <- t(top5df_io)
+      io2_dge <- DGEList(counts = top5df_io,group=factor(io_group$IHC.HER2))
+      io2_dge <- calcNormFactors(io2_dge)
+      
+      io2_mds <- plotMDS.DGEList(io2_dge,
+                                method = "logFC"  , labels = io2_dge$samples$group, 
+                                gene.selection = "pairwise", var.explained = TRUE)
+      
+      # comment these lines and run one at a time or R crashes idk man
+      io2plot <- data.frame(Dim1 = io2_mds$x, Dim2 = io2_mds$y, Group = factor(io2_dge$samples$group))
+      
+      ggplot(io2plot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      # still not able to cluster these things apart, even with just using most
+      # differentially expressed genes. rip.
+      
+# so let's try instead integrating as much as we can; let's put a csv together to feed into scikit learn
 
+# 13. Outputting a CSV to use in scikit learn in python, just throwing as many features in there 
+      # as I can think may help and which don't have NA
+      # maybe use FISH here if it has enough rows
+      # just gonna drop all the NA anyway
+      io_csv_df <- as.data.frame(t(top5df_io))
+      io_csv_df <- tibble::rownames_to_column(io_csv_df, "Patient.ID")
       
-      # d_her2df <- d_t[c("Patient.ID", "ERBB2")]
-      # 
-      # # merge in the patient ID, not a DGE so require grouping info
-      # her2df <- her2df %>%
-      #   left_join(io_group, by = "Patient.ID")
-      # 
+      io_csv_df <- io_csv_df %>%
+        left_join(io_group, by = "Patient.ID")
+      io_csv_df <- distinct(io_csv_df)
       
+      # ok that's all gucci. get all data in and put io at end w dplyr
       
-      ######################
-      # below attempt to get barplot ... but I'm not sure of what value it'd be. The density plot is
-      # sufficiently interesting!!!!
-      #######################3
+      # other data to grab:
+      # Ethnicity
+      # Fraction Genome Altered
+      # Race Category
+      # Sex
+      # Age
       
-      #herr = transform(her2_positive, mean = colMeans(her2_positive['ERBB2']), sd = apply(her2_positive['ERBB2'],1,sd))
+      # method: get a df of these from clinical data
+      # then merge via PatientID
       
-      #df1  = transform(df, mean=rowMeans(df[cols]), sd=apply(df[cols],1, sd))
+      # a lot of NA in Race and Ethnicity, don't wanna bias so I'll drop those
+      # and sex, which is majority women. So we're mostly using age, fraction genome 
+      # and RNASeq data to predict IHC, not great, not terrible
+      tocsv_clinical <- clinical_data[c("Patient.ID","Diagnosis.Age","Fraction.Genome.Altered")]
       
+      all_to_csv <- io_csv_df %>%
+        left_join(tocsv_clinical, by = "Patient.ID")
       
-      # #ggplot(df1, aes(x=as.factor(Gene), y=mean, fill=Species)) +
-      #   geom_bar(position=position_dodge(), stat="identity", colour='black') +
-      #   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,position=position_dodge(.9))
-      # 
-      # now we can get the barplots... maybe we could of also just used the right specification lol
-      # but! need error bars and stuff, so let's see what we can do
+      all_to_csv <- distinct(all_to_csv)
+      all_to_csv <- drop_na(all_to_csv)
       
-      
-      # ok, now I think we can make some bar plots by group lol. Easy actually,
-      # but this method... it could be adapted for all the most DE genes
-      # by using the paste function as I did in my thesis lol
-    
+      all_to_csv <- all_to_csv %>% 
+        relocate(IHC.HER2, .after = last_col())
+      # OK, now we can save to a csv, input to a python script, get the
+      # model and somehow include in Rmd and write things up. WOO!
+      write.csv(all_to_csv,"~/rnaseq/tologit.csv",row.names = FALSE)
