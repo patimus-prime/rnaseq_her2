@@ -14,6 +14,7 @@ library(clipr)
 library(edgeR)  # NOTE: Must capitalize R lolololol
 library(tibble)
 library(magrittr)
+library(tibble)
 
 setwd("~/rnaseq")
 rna_data <- read.csv("tcga.brca.rsem.csv",
@@ -180,7 +181,6 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
                            method = "logFC"  , labels = d$samples$group, 
                            gene.selection = "common", var.explained = TRUE)
     
-      # comment these lines and run one at a time or R crashes idk man
       uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
       ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
@@ -188,8 +188,8 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
 # 8. Try other stuff -------
     # let's try differntially expressed genes - maybe there's just a bunch that confuddle things
       
-      # d <- estimateCommonDisp(d, vebose = TRUE)
-      # d <- estimateTagwiseDisp(d, trend = "none")
+      d <- estimateCommonDisp(d, vebose = TRUE)
+      d <- estimateTagwiseDisp(d, trend = "none")
       # plotBCV(d, cex = 0.4)
       # et <- exactTest(d)
       # topTags(et, n = 20)
@@ -201,8 +201,13 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # STILL NO PICKLES!!!!!!!!!!!!!!!
       
 # 9. Ok, let's try specifying a comparison against positive and negative testers
-      # et2 <- exactTest(d, pair = c("Positive","Negative"))
-      # topTags(et2, n = 20)
+      et2 <- exactTest(d, pair = c("Positive","Negative"))
+      io_DEGdf <- topTags(et2, n = 10)
+      # THERE'S ERBB2 LET'S GET A LIST OF THOSE GENES HOMIE!
+      
+      io_DEGdf <- as.data.frame(io_DEG)
+      io_DEG <- tibble::rownames_to_column(io_DEGdf, "Genes")
+      io_ls_DEG <- io_DEG$Genes
       # # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
       # 
       # # well, we can do a quick smear plot, but more interesting will be to go back
@@ -304,62 +309,78 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # and cross-reference with the groups. dunno if possible outside the object
       # but anyway i'm fuckin done lol for tonight
       
-      her2_io <- sort(io_t$ERBB2)
-      turbo <- as.data.frame(her2_io)
+      # from: https://stackoverflow.com/questions/29511215/convert-row-names-into-first-column
+      # df <- tibble::rownames_to_column(df, "VALUE")
       
+      #cool easy
+      io_t_norm <- tibble::rownames_to_column(io_t, "Patient.ID")
       
-      # something akin to this, we could maybe plot v. ea gene
-      # a deprecated analysis but maybe informative, idk man. could
-      # have significant difference in normalized counts
+      # now drop everything except  ERBB2 and Patient.ID
+      # FIXME: UNNCESSARY PROCESS
+      her2df <- io_t_norm[c("Patient.ID", "ERBB2")]
       
-      # mds_bcv <- plotMDS.DGEList(d, top = 500, 
-      #                        method = "bcv"  , labels = d$samples$group, 
-      #                        gene.selection = "common", var.explained = TRUE)
-      # bcvplot <- data.frame(Dim1 = mds_bcv$x, Dim2 = mds_bcv$y, Group = factor(d$samples$group))
-      # ggplot(bcvplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      # merge in the patient ID, not a DGE so require grouping info
+      her2df <- her2df %>%
+        left_join(io_group, by = "Patient.ID")
+      
+      #her2_positive <- her2df[her2df$IHC.HER2 == 'Positive',] # beware the comma!
+      
+      #her2_negative <- her2df[her2df$IHC.HER2 == 'Negative',]
+      
+      #ggplot(her2df, aes(x=as.factor(IHC.HER2), y = ERBB2)) +
+      #         geom_bar(stat = "summary", position = "dodge") # stat = identity?
+      
+      # VERY INTERESTING!!!
+      ggplot(her2df, aes(x = ERBB2, colour = IHC.HER2)) +
+        geom_density()
+      
+      # this is so interesting in fact, we'll go back and do another plot like this
+      # for all the IHC levels, and see how that does. 
+      # then if we still see it, we can see about also plotting other DE genes for either df
+      
+      d_t <- as.data.frame(t(as.data.frame(norm_counts)))
+      d_t <- tibble::rownames_to_column(d_t, "Patient.ID")
+      # actually let's merge beforehand
+      d_t <- d_t %>%
+        left_join(matched_patient_IHC, by = "Patient.ID")
+      
+      ggplot(d_t, aes(x = ERBB2, colour = IHC.HER2)) +
+        geom_density()
+      # well, noisier, but we see some cutoff
+      # where mostly positive stuff appears. but definity noisier
+      # so still shows supplmentary is the way to go
+      # let's look at clustering by just like the top 10 most DE genes,
+      # as determined by those most different in positive/negative groups
+      
+
+      
+      # d_her2df <- d_t[c("Patient.ID", "ERBB2")]
+      # 
+      # # merge in the patient ID, not a DGE so require grouping info
+      # her2df <- her2df %>%
+      #   left_join(io_group, by = "Patient.ID")
       # 
       
       
-      # 
-      # 
-      # mds_bcv <- plotMDS.DGEList(matched_rna_data, top = 500, 
-      #                        method = "logFC"  , labels = d$samples$group, 
-      #                        gene.selection = "common", var.explained = TRUE)
-      # 
-      # uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
-      # ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
-      # 
-      # so basically we do get the plot we want, but... it is not very informative!!
-      # RIP!
+      ######################
+      # below attempt to get barplot ... but I'm not sure of what value it'd be. The density plot is
+      # sufficiently interesting!!!!
+      #######################3
       
-      # so now we move on to other analyses
+      #herr = transform(her2_positive, mean = colMeans(her2_positive['ERBB2']), sd = apply(her2_positive['ERBB2'],1,sd))
       
-# 8. WTF am i doing
+      #df1  = transform(df, mean=rowMeans(df[cols]), sd=apply(df[cols],1, sd))
       
       
-      # mds$var.explained
-      # mdsDf <- as.data.frame(mds@.Data[[3]])
-      # left_join(mdsDf,as.data.frame(d$samples$group), by= character())
-      # d$samples$group
-      # mds
-      # mdsDf$new <- d$samples$group
+      # #ggplot(df1, aes(x=as.factor(Gene), y=mean, fill=Species)) +
+      #   geom_bar(position=position_dodge(), stat="identity", colour='black') +
+      #   geom_errorbar(aes(ymin=mean-sd, ymax=mean+sd), width=.2,position=position_dodge(.9))
       # 
-      # mds$eigen.vectors
-      # mds$gene.selection  
-      # mds$dim.plot
-      # mds$
+      # now we can get the barplots... maybe we could of also just used the right specification lol
+      # but! need error bars and stuff, so let's see what we can do
       
-     #  mds <- plotMDS(x)
-     #  toplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(paste0("Grp", rep(1:2, each = 3))))
-     #  library(ggplot2)
-     #  ggplot(toplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
-     #  
-     #  toplot <- as.data.frame(mds@.Data[[3]]) %>%
-     #    left_join(d$samples$group)
-     # #mds@.Data[[3]]
-     #  mds@.Data[[3]] %>%
-     #    as.data.frame() %>%
-     #    #set_colnames(c("Dim1", "Dim2")) %>%
-     #    #rownames_to_column("SampleID") %>%
-     #    left_join(d$samples$group)
-     #  
+      
+      # ok, now I think we can make some bar plots by group lol. Easy actually,
+      # but this method... it could be adapted for all the most DE genes
+      # by using the paste function as I did in my thesis lol
+    
