@@ -169,20 +169,81 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       #tmm <- cpm(dge)
       
       
-# 7. Further processes in edgeR ----------------
+# 7. Attempt clustering in edgeR ----------------
       # without logs, very poor graph
       #plotMDS(matched_rna_data)
       
       # with logs, use only 500 top genes, use group labels instead of patient IDS
       #plotMDS.DGEList(matched_rna_data, top = 500, labels = d$samples$group, gene.selection = "common", pch = ".") #,  pch = points(d$samples$group))
       
-      mds <- plotMDS.DGEList(matched_rna_data, top = 500, 
+      mds <- plotMDS.DGEList(d, top = 500, 
                            method = "logFC"  , labels = d$samples$group, 
                            gene.selection = "common", var.explained = TRUE)
     
+      # comment these lines and run one at a time or R crashes idk man
+      #uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
+      #ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
-      uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
-      ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      
+# 8. Try other stuff -------
+    # let's try differntially expressed genes - maybe there's just a bunch that confuddle things
+      d <- estimateCommonDisp(d, vebose = TRUE)
+      d <- estimateTagwiseDisp(d, trend = "none")
+      plotBCV(d, cex = 0.4)
+      et <- exactTest(d)
+      topTags(et, n = 20)
+      
+      detags <- rownames(topTags(et, n=20))
+      df_detags <- cpm(d)[detags,]
+      df_detags <- as.data.frame(df_detags)
+      # STILL NO PICKLES!!!!!!!!!!!!!!!
+      
+# 9. Ok, let's try specifying a comparison against positive and negative testers
+      et2 <- exactTest(d, pair = c("Positive","Negative"))
+      topTags(et2, n = 20)
+      # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
+      
+      
+      # now THIS is really interesting. We don't even see HER2 on here. This suggests
+      # maybe we have to go back and ONLY look at positive/negative relations.
+      # equivocal etc. may affect the calculation of variance etc.
+      
+      # mds_bcv <- plotMDS.DGEList(d, top = 500, 
+      #                        method = "bcv"  , labels = d$samples$group, 
+      #                        gene.selection = "common", var.explained = TRUE)
+      # bcvplot <- data.frame(Dim1 = mds_bcv$x, Dim2 = mds_bcv$y, Group = factor(d$samples$group))
+      # ggplot(bcvplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      # 
+      
+      
+      # 
+      # 
+      # mds_bcv <- plotMDS.DGEList(matched_rna_data, top = 500, 
+      #                        method = "logFC"  , labels = d$samples$group, 
+      #                        gene.selection = "common", var.explained = TRUE)
+      # 
+      # uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
+      # ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      # 
+      # so basically we do get the plot we want, but... it is not very informative!!
+      # RIP!
+      
+      # so now we move on to other analyses
+      
+# 8. WTF am i doing
+      
+      
+      # mds$var.explained
+      # mdsDf <- as.data.frame(mds@.Data[[3]])
+      # left_join(mdsDf,as.data.frame(d$samples$group), by= character())
+      # d$samples$group
+      # mds
+      # mdsDf$new <- d$samples$group
+      # 
+      # mds$eigen.vectors
+      # mds$gene.selection  
+      # mds$dim.plot
+      # mds$
       
      #  mds <- plotMDS(x)
      #  toplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(paste0("Grp", rep(1:2, each = 3))))
