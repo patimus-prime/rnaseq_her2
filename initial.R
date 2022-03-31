@@ -187,26 +187,105 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       
 # 8. Try other stuff -------
     # let's try differntially expressed genes - maybe there's just a bunch that confuddle things
-      d <- estimateCommonDisp(d, vebose = TRUE)
-      d <- estimateTagwiseDisp(d, trend = "none")
-      plotBCV(d, cex = 0.4)
-      et <- exactTest(d)
-      topTags(et, n = 20)
       
-      detags <- rownames(topTags(et, n=20))
-      df_detags <- cpm(d)[detags,]
-      df_detags <- as.data.frame(df_detags)
+      # d <- estimateCommonDisp(d, vebose = TRUE)
+      # d <- estimateTagwiseDisp(d, trend = "none")
+      # plotBCV(d, cex = 0.4)
+      # et <- exactTest(d)
+      # topTags(et, n = 20)
+      # 
+      # detags <- rownames(topTags(et, n=20))
+      # df_detags <- cpm(d)[detags,]
+      # df_detags <- as.data.frame(df_detags)
+      
       # STILL NO PICKLES!!!!!!!!!!!!!!!
       
 # 9. Ok, let's try specifying a comparison against positive and negative testers
-      et2 <- exactTest(d, pair = c("Positive","Negative"))
-      topTags(et2, n = 20)
-      # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
+      # et2 <- exactTest(d, pair = c("Positive","Negative"))
+      # topTags(et2, n = 20)
+      # # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
+      # 
+      # # well, we can do a quick smear plot, but more interesting will be to go back
+      # # and redo PCA, only going for the positive and negative
+      # # this does suggest that this whole method can only be supplementary to ICH etc.
+      # summary(de <- decideTestsDGE(et2, p=0.05))
+      # detags <- rownames(d)[as.logical(de)]
+      # plotSmear(et2, de.tags=detags)
+      # abline(h = c(-2, 2), col = "blue")
       
+      #  cool. but better if we could mark indiv. genes
+      # that'll be a tomorrow problem to put in tags for ERBB2 etc.
+      # for now let's go back do clustering and only do positive/negative
+    
       
       # now THIS is really interesting. We don't even see HER2 on here. This suggests
       # maybe we have to go back and ONLY look at positive/negative relations.
       # equivocal etc. may affect the calculation of variance etc.
+      
+      
+# 10. Only Positive/negative results into PCA. May do design matrix later
+      # but for now this is the most interesting to go after. Can demonstrate
+      # the model first before doing design matrix stuff - this would simply
+      # be enumerating the equivocal etc. and therefore not be of additional use
+      
+      ####################3
+      # A. Prepare the data for going into object
+      ######################
+      
+      # this is going to require constructing a new dge object ... hopefully more straightforward this time
+      # let's try appending the positive/negative dataframes first
+      io_patients <- rbind(positive_patients, negative_patients)
+      io_patients <- distinct(io_patients)
+  
+      io_rna_match <- intersect(io_patients$Patient.ID, colnames(rna_data_t_rd))
+      # mismatch again... just use same method to eliminate the weird rows
+      
+      io_matched_rna <- select(rna_data_t_rd, io_rna_match)
+    
+      Patient.ID <- intersect(io_patients$Patient.ID, io_rna_match) # NEW MATCHING IDS
+      
+      ioMATCHES <- as.data.frame(Patient.ID)
+      
+      io_group <- io_patients %>%
+        semi_join(ioMATCHES, by = "Patient.ID")
+      # cool, easy this time.
+      
+      # so we have: 
+      # io_group
+      # and
+      # io_matched_rna
+      
+      # now repeat the process same as before.
+      
+      ######################3
+      # B. Create the object
+      ###################3#####
+      
+      cutoff = 1 # counts per million; other cutoffs are used but this is what we'll start with
+      
+      keep <- rowSums(cpm(io_matched_rna) > cutoff) >= ncol(io_matched_rna) #LAST PART == # LIBRARIES, SO 
+      #THE ENTIRE ROW HAS AT LEAST 1 READ/CPM PER LIBRARY
+      
+      io_matched_rna <- io_matched_rna[keep,]
+      # down to 9289 genes
+    
+      io_dge <- DGEList(counts = io_matched_rna, group = factor(io_group$IHC.HER2))
+      
+      io_dge <- calcNormFactors(io_dge)
+      
+      io_dge$samples # more checking everything's A-OK
+      
+      io_norm_counts <- cpm(io_dge)
+      
+      io_mds <- plotMDS.DGEList(io_dge, top = 500, 
+                                method = "logFC"  , labels = io_dge$samples$group, 
+                                gene.selection = "common", var.explained = TRUE)
+      
+      
+      # comment these lines and run one at a time or R crashes idk man
+      ioplot <- data.frame(Dim1 = io_mds$x, Dim2 = io_mds$y, Group = factor(io_dge$samples$group))
+      
+      #ggplot(ioplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
       # mds_bcv <- plotMDS.DGEList(d, top = 500, 
       #                        method = "bcv"  , labels = d$samples$group, 
