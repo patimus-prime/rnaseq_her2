@@ -181,8 +181,8 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
                            gene.selection = "common", var.explained = TRUE)
     
       # comment these lines and run one at a time or R crashes idk man
-      #uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
-      #ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
+      ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
       
 # 8. Try other stuff -------
@@ -285,7 +285,32 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # comment these lines and run one at a time or R crashes idk man
       ioplot <- data.frame(Dim1 = io_mds$x, Dim2 = io_mds$y, Group = factor(io_dge$samples$group))
       
-      #ggplot(ioplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      ggplot(ioplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      
+      # this is more informative than the last - although not too much
+      # there's a cluster to the right, but it appears to be a small proportion
+      # of the overall data...
+      
+      # maybe if we only use ERRB2 data to separate things?
+      # we can just plot based on ERRB2 expression. 
+      # i'll do that, but otherwise move onto modeling
+      
+# 11. Let's just get the normalized expression data of the different thresholds
+      # and see how it may differ. Simple barplot. Nothing fancy.
+      
+      # So...
+      io_t <- as.data.frame(t(as.data.frame(io_norm_counts)))
+      # this one here, is what you'd wanna filter down for only the ERBB2 gene
+      # and cross-reference with the groups. dunno if possible outside the object
+      # but anyway i'm fuckin done lol for tonight
+      
+      her2_io <- sort(io_t$ERBB2)
+      turbo <- as.data.frame(her2_io)
+      
+      
+      # something akin to this, we could maybe plot v. ea gene
+      # a deprecated analysis but maybe informative, idk man. could
+      # have significant difference in normalized counts
       
       # mds_bcv <- plotMDS.DGEList(d, top = 500, 
       #                        method = "bcv"  , labels = d$samples$group, 
