@@ -1,9 +1,3 @@
-# This will be my beginning of addressing this fun RNA-Seq challenge
-# I have like a 20 step plan to go through, so here we go
-
-# Call every library I can think of potentially using:
-
-
 library(dplyr) 
 library(data.table)
 library(tidyr)
@@ -32,39 +26,36 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
 #    can come back and implement design matrix
 #    for other tumors in same patient later, but for now just want one thing per patient
 
-#combined_results_df %>%
-#  filter(grepl('surface area = ', V1)) -> combined_results_df
-
-rna_data_primary_tumor_only <- rna_data %>%
-  filter(grepl('Primary Tumor', sample_type)) 
-# 1212 rows to 1093
-
+    rna_data_primary_tumor_only <- rna_data %>%
+      filter(grepl('Primary Tumor', sample_type)) 
+    # 1212 rows to 1093
+    
 
 # 2. Drop barcode and sample type columns now that we've filtered the latter ------------
 #    Leaving patient_id unaltered; when we transpose and normalize we may then
 #    use this in a design matrix or pull for modeling, scoop up other data from clinic
 
-rna_data_genes_only <- rna_data_primary_tumor_only %>% 
-  select(-c("bcr_patient_barcode","sample_type"))
+    rna_data_genes_only <- rna_data_primary_tumor_only %>% 
+      select(-c("bcr_patient_barcode","sample_type"))
 
 # 3. Transpose this dataframe so we can begin our work! Patient_id/libraries as columns ----------------
-
-#testrna <- as.data.frame(rna_data_genes_only[,1:9])
-
-# from: https://stackoverflow.com/questions/7970179/transposing-a-dataframe-maintaining-the-first-column-as-heading
-#tmydf = setNames(data.frame(t(testrna[,-1])), testrna[,1])
-
-# 3 last lines DO work, so applying the same process
-
-rna_data_t = setNames(data.frame(t(rna_data_genes_only[,-1])), rna_data_genes_only[,1])
-
+    
+    #testrna <- as.data.frame(rna_data_genes_only[,1:9])
+    
+    # from: https://stackoverflow.com/questions/7970179/transposing-a-dataframe-maintaining-the-first-column-as-heading
+    #tmydf = setNames(data.frame(t(testrna[,-1])), testrna[,1])
+    
+    # 3 last lines DO work, so applying the same process
+    
+    rna_data_t = setNames(data.frame(t(rna_data_genes_only[,-1])), rna_data_genes_only[,1])
+    
 
 # 4. Round up all data ----------------
 
-rna_data_t_rd <- round(rna_data_t, digits = 0)
-# hold for data from other files
-# this will be principally used for most stuff in edgeR, but
-# we'll want to pivot back AFTER normalizing and use HER2 column and others for modeling
+    rna_data_t_rd <- round(rna_data_t, digits = 0)
+    # hold for data from other files
+    # this will be principally used for most stuff in edgeR, but
+    # we'll want to pivot back AFTER normalizing and use HER2 column and others for modeling
 
 
 # 5. We must get data from other sources --------------------
@@ -171,8 +162,6 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       
       
 # 7. Attempt clustering in edgeR ----------------
-      # without logs, very poor graph
-      #plotMDS(matched_rna_data)
       
       # with logs, use only 500 top genes, use group labels instead of patient IDS
       #plotMDS.DGEList(matched_rna_data, top = 500, labels = d$samples$group, gene.selection = "common", pch = ".") #,  pch = points(d$samples$group))
@@ -182,7 +171,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
                            gene.selection = "common", var.explained = TRUE)
     
       uberplot <- data.frame(Dim1 = mds$x, Dim2 = mds$y, Group = factor(d$samples$group))
-      ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      d_mdsplot <- ggplot(uberplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
       
 # 8. Try other stuff -------
@@ -190,7 +179,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       
       d <- estimateCommonDisp(d, vebose = TRUE)
       d <- estimateTagwiseDisp(d, trend = "none")
-      # plotBCV(d, cex = 0.4)
+      plotBCV(d, cex = 0.4)
       # et <- exactTest(d)
       # topTags(et, n = 20)
       # 
@@ -201,6 +190,8 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # STILL NO PICKLES!!!!!!!!!!!!!!!
       
 # 9. Ok, let's try specifying a comparison against positive and negative testers
+      # NOTE: FROM HERE OUT, IO IS AS IN, I/O POSITIVE/NEGATIVE ONLY
+      
       et2 <- exactTest(d, pair = c("Positive","Negative"))
       io_DEGdf <- topTags(et2, n = 10)
       # THERE'S ERBB2 LET'S GET A LIST OF THOSE GENES HOMIE!
@@ -208,15 +199,16 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       io_DEGdf <- as.data.frame(io_DEGdf)
       io_DEG <- tibble::rownames_to_column(io_DEGdf, "Genes")
       io_ls_DEG <- io_DEG$Genes
-      # # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA FUCK YES
+      # # AHHHHHHH NOW WE FIND ERBB2 WHAT WHAT!!@!!!!!! AHAHAHAAHAHAHAHHAHA YES
       # 
       # # well, we can do a quick smear plot, but more interesting will be to go back
       # # and redo PCA, only going for the positive and negative
       # # this does suggest that this whole method can only be supplementary to ICH etc.
-      # summary(de <- decideTestsDGE(et2, p=0.05))
-      # detags <- rownames(d)[as.logical(de)]
-      # plotSmear(et2, de.tags=detags)
-      # abline(h = c(-2, 2), col = "blue")
+       summary(de <- decideTestsDGE(et2, p=0.05))
+       detags <- rownames(d)[as.logical(de)]
+       d_smearplot <- plotSmear(et2, de.tags=detags)
+       d_smearplot
+       abline(h = c(-2, 2), col = "blue")
       
       #  cool. but better if we could mark indiv. genes
       # that'll be a tomorrow problem to put in tags for ERBB2 etc.
@@ -290,7 +282,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # comment these lines and run one at a time or R crashes idk man
       ioplot <- data.frame(Dim1 = io_mds$x, Dim2 = io_mds$y, Group = factor(io_dge$samples$group))
       
-      ggplot(ioplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      io_cluster <- ggplot(ioplot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       
       # this is more informative than the last - although not too much
       # there's a cluster to the right, but it appears to be a small proportion
@@ -331,7 +323,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       #         geom_bar(stat = "summary", position = "dodge") # stat = identity?
       
       # VERY INTERESTING!!!
-      ggplot(her2df, aes(x = ERBB2, colour = IHC.HER2)) +
+      io_densityher2 <- ggplot(her2df, aes(x = ERBB2, colour = IHC.HER2)) +
         geom_density()
       
       # this is so interesting in fact, we'll go back and do another plot like this
@@ -344,19 +336,19 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       d_t <- d_t %>%
         left_join(matched_patient_IHC, by = "Patient.ID")
       
-      ggplot(d_t, aes(x = ERBB2, colour = IHC.HER2)) +
+      density_d <- ggplot(d_t, aes(x = ERBB2, colour = IHC.HER2)) +
         geom_density()
       
       
       io_ls_DEG
       
-      ggplot(d_t, aes(x = STARD3, colour = IHC.HER2)) +
+      density1 <- ggplot(d_t, aes(x = STARD3, colour = IHC.HER2)) +
           geom_density()
-      ggplot(d_t, aes(x = PGAP3, colour = IHC.HER2)) +
+      density2 <- ggplot(d_t, aes(x = PGAP3, colour = IHC.HER2)) +
         geom_density()
-      ggplot(d_t, aes(x = C17orf37, colour = IHC.HER2)) +
+      density3 <- ggplot(d_t, aes(x = C17orf37, colour = IHC.HER2)) +
         geom_density()
-      ggplot(d_t, aes(x = ORMDL3, colour = IHC.HER2)) +
+      density4 <- ggplot(d_t, aes(x = ORMDL3, colour = IHC.HER2)) +
         geom_density()
       
       
@@ -382,7 +374,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       # comment these lines and run one at a time or R crashes idk man
       io2plot <- data.frame(Dim1 = io2_mds$x, Dim2 = io2_mds$y, Group = factor(io2_dge$samples$group))
       
-      ggplot(io2plot, aes(Dim1, Dim2, colour = Group)) + geom_point()
+      io_top5_cluster <- ggplot(io2plot, aes(Dim1, Dim2, colour = Group)) + geom_point()
       # still not able to cluster these things apart, even with just using most
       # differentially expressed genes. rip.
       
@@ -429,4 +421,3 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
       write.csv(all_to_csv,"~/rnaseq/tologit.csv",row.names = FALSE) # leave pos/neg to be sure when building model
       rm(clinical_data)
       rm(temp)      
-            
