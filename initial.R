@@ -426,4 +426,7 @@ rna_data_t_rd <- round(rna_data_t, digits = 0)
         relocate(IHC.HER2, .after = last_col())
       # OK, now we can save to a csv, input to a python script, get the
       # model and somehow include in Rmd and write things up. WOO!
-      write.csv(all_to_csv,"~/rnaseq/tologit.csv",row.names = FALSE)
+      write.csv(all_to_csv,"~/rnaseq/tologit.csv",row.names = FALSE) # leave pos/neg to be sure when building model
+      rm(clinical_data)
+      rm(temp)      
+            
