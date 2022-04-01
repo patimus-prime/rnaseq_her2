@@ -30,7 +30,7 @@ load("her2.RData") # get this loaded in the .rmd environment cuz it's messy othe
 
 Hi! I'll summarize just below what I've done here, and then tell the story of my efforts to make sense of these data. 
 
-The code, and the Kaggle notebook I'll make mention of later, are both here: <https://github.com/patimus-prime/rnaseq_her2>. I wrote this in a pretty relaxed tone given this was a coding challenge. My Master's thesis is available at my Github for an example of more working-level writing.
+The code, and the Kaggle notebook I'll make mention of later, are both here: <https://github.com/patimus-prime/rnaseq_her2>. I wrote this in a pretty relaxed tone given this was a coding challenge. My Master's thesis is available here: <https://patimus-prime.github.io/heme-binding/index.html> for an example of more working-level writing.
 
 ## Summary/Abstract
 
