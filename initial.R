@@ -177,16 +177,16 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
 # 8. Try other stuff -------
     # let's try differntially expressed genes - maybe there's just a bunch that confuddle things
       
-      d <- estimateCommonDisp(d, vebose = TRUE)
+      d <- estimateCommonDisp(d, vebose = TRUE) #verbose? works, anyway
       d <- estimateTagwiseDisp(d, trend = "none")
-      plotBCV(d, cex = 0.4)
-      # et <- exactTest(d)
-      # topTags(et, n = 20)
+      
+      #et <- exactTest(d)
+      #topTags(et, n = 10)
       # 
       # detags <- rownames(topTags(et, n=20))
       # df_detags <- cpm(d)[detags,]
       # df_detags <- as.data.frame(df_detags)
-      
+      # 
       # STILL NO PICKLES!!!!!!!!!!!!!!!
       
 # 9. Ok, let's try specifying a comparison against positive and negative testers
@@ -206,8 +206,8 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
       # # this does suggest that this whole method can only be supplementary to ICH etc.
        summary(de <- decideTestsDGE(et2, p=0.05))
        detags <- rownames(d)[as.logical(de)]
-       d_smearplot <- plotSmear(et2, de.tags=detags)
-       d_smearplot
+       plotSmear(et2, de.tags=detags)
+       #d_smearplot
        abline(h = c(-2, 2), col = "blue")
       
       #  cool. but better if we could mark indiv. genes
@@ -326,6 +326,7 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
       io_densityher2 <- ggplot(her2df, aes(x = ERBB2, colour = IHC.HER2)) +
         geom_density()
       
+      
       # this is so interesting in fact, we'll go back and do another plot like this
       # for all the IHC levels, and see how that does. 
       # then if we still see it, we can see about also plotting other DE genes for either df
@@ -411,11 +412,34 @@ rna_data <- read.csv("tcga.brca.rsem.csv",
       all_to_csv <- io_csv_df %>%
         left_join(tocsv_clinical, by = "Patient.ID")
       
+      # i didn't end up going back and defining a design matrix with the count data
+      # technically a surrogate for RNA expression levels; so, perhaps it'd provide
+      # some nice levels to work with the positive/negative
+      # but... that's more work. so let's see if it benefits the logit function first
+      
+      # so i'll try and use it in the logit function
+      copy_df <- read.csv("brca_tcga_erbb2_copy_number.csv",
+                          stringsAsFactors = FALSE)
+      # gotta change its column name lol, and drop sample id
+      copy_df <- copy_df %>%
+        rename(Patient.ID = patient_id)
+      copy_df <- copy_df[c("Patient.ID","erbb2_copy_number")]
+      
+      all_to_csv <- all_to_csv %>%
+        left_join(copy_df, by = "Patient.ID")
+      
+      
+      
       all_to_csv <- distinct(all_to_csv)
       all_to_csv <- drop_na(all_to_csv)
       
+      
+      
+      
       all_to_csv <- all_to_csv %>% 
         relocate(IHC.HER2, .after = last_col())
+      
+      
       # OK, now we can save to a csv, input to a python script, get the
       # model and somehow include in Rmd and write things up. WOO!
       write.csv(all_to_csv,"~/rnaseq/tologit.csv",row.names = FALSE) # leave pos/neg to be sure when building model
